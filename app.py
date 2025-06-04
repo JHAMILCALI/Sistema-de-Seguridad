@@ -7,7 +7,8 @@ import os
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///gestion_usuarios.db'
+# Reemplaza la línea de SQLite con esta configuración para MariaDB
+app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:@localhost/gestion_usuarios_seguridad'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -92,16 +93,11 @@ def requiere_permiso(permiso_nombre):
                 flash('Debes iniciar sesión primero', 'danger')
                 return redirect(url_for('login'))
             
-            user = Usuario.query.get(session['user_id'])
-            tiene_permiso = False
-            
-            for rol in user.roles:
-                for permiso in rol.permisos:
-                    if permiso.nombre == permiso_nombre:
-                        tiene_permiso = True
-                        break
-                if tiene_permiso:
-                    break
+            # Usamos una consulta más eficiente con joins
+            tiene_permiso = db.session.query(Permiso).join(rol_permiso).join(Rol).join(usuario_rol).filter(
+                usuario_rol.c.usuario_id == session['user_id'],
+                Permiso.nombre == permiso_nombre
+            ).first() is not None
             
             if not tiene_permiso:
                 flash('No tienes permiso para acceder a esta página', 'danger')
@@ -318,4 +314,9 @@ def editar_registro(id):
     return render_template('editar_registro.html', registro=registro)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    with app.app_context():
+        # Forzar el reinicio de los autoincrementos
+        #db.engine.execute("SET FOREIGN_KEY_CHECKS = 0;")
+        #db.create_all()
+        #db.engine.execute("SET FOREIGN_KEY_CHECKS = 1;")
+        app.run(debug=True)
