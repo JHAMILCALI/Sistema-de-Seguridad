@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2 class="mb-4"><i class="bi bi-key"></i> Gestión de Permisos</h2>
+
+<div class="card">
+    <div class="card-header bg-primary text-white">
+        <div class="d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">Listado de Permisos</h4>
+            <a href="{{ url_for('crear_permiso') }}" class="btn btn-light btn-sm">
+                <i class="bi bi-plus-circle"></i> Nuevo Permiso
+            </a>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nombre</th>
+                        <th>Roles Asociados</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for permiso in permisos %}
+                    <tr>
+                        <td>{{ permiso.id }}</td>
+                        <td>
+                            <span class="badge bg-primary">
+                                <i class="bi bi-shield-check"></i> {{ permiso.nombre }}
+                            </span>
+                        </td>
+                        <td>
+                            {% for rol in permiso.roles %}
+                            <span class="badge bg-secondary">{{ rol.nombre }}</span>
+                            {% endfor %}
+                        </td>
+                        <td>
+                            <div class="btn-group" role="group">
+                                <a href="{{ url_for('editar_permiso', id=permiso.id) }}" 
+                                   class="btn btn-sm btn-outline-warning">
+                                    <i class="bi bi-pencil-square"></i> Editar
+                                </a>
+                                {% if permiso.nombre not in ['crear', 'leer', 'editar', 'eliminar'] %}
+                                <form action="{{ url_for('eliminar_permiso', id=permiso.id) }}" method="POST" class="d-inline">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger" 
+                                            onclick="return confirm('¿Eliminar este permiso?')">
+                                        <i class="bi bi-trash"></i> Eliminar
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="card-footer text-muted">
+        Total de permisos: {{ permisos|length }}
+    </div>
+</div>
+
+<div class="alert alert-info mt-4">
+    <h5><i class="bi bi-info-circle"></i> Sobre los permisos básicos:</h5>
+    <ul>
+        <li>Los permisos <strong>crear</strong>, <strong>leer</strong>, <strong>editar</strong> y <strong>eliminar</strong> son del sistema y no pueden borrarse</li>
+        <li>Puedes crear nuevos permisos para funcionalidades específicas</li>
+    </ul>
+</div>
+{% endblock %}

@@ -278,6 +278,58 @@ def listar_permisos():
     permisos = Permiso.query.all()
     return render_template('permisos/listar.html', permisos=permisos)
 
+@app.route('/permisos/crear', methods=['GET', 'POST'])
+@requiere_permiso('crear')
+def crear_permiso():
+    if request.method == 'POST':
+        nombre = request.form['nombre'].lower()
+        
+        if Permiso.query.filter_by(nombre=nombre).first():
+            flash('Este permiso ya existe', 'danger')
+            return redirect(url_for('crear_permiso'))
+        
+        nuevo_permiso = Permiso(nombre=nombre)
+        db.session.add(nuevo_permiso)
+        db.session.commit()
+        
+        flash(f'Permiso "{nombre}" creado exitosamente', 'success')
+        return redirect(url_for('listar_permisos'))
+    
+    return render_template('permisos/crear.html')
+
+@app.route('/permisos/editar/<int:id>', methods=['GET', 'POST'])
+@requiere_permiso('editar')
+def editar_permiso(id):
+    permiso = Permiso.query.get_or_404(id)
+    
+    if request.method == 'POST':
+        nuevo_nombre = request.form['nombre'].lower()
+        
+        if nuevo_nombre != permiso.nombre and Permiso.query.filter_by(nombre=nuevo_nombre).first():
+            flash('Ya existe un permiso con ese nombre', 'danger')
+        else:
+            permiso.nombre = nuevo_nombre
+            db.session.commit()
+            flash('Permiso actualizado', 'success')
+        
+        return redirect(url_for('listar_permisos'))
+    
+    return render_template('permisos/editar.html', permiso=permiso)
+
+@app.route('/permisos/eliminar/<int:id>', methods=['POST'])
+@requiere_permiso('eliminar')
+def eliminar_permiso(id):
+    permiso = Permiso.query.get_or_404(id)
+    
+    if permiso.nombre in ['crear', 'leer', 'editar', 'eliminar']:
+        flash('No se pueden eliminar los permisos básicos del sistema', 'danger')
+    else:
+        db.session.delete(permiso)
+        db.session.commit()
+        flash('Permiso eliminado exitosamente', 'success')
+    
+    return redirect(url_for('listar_permisos'))
+
 @app.route('/registros')
 @requiere_permiso('leer')
 def ver_registros():
@@ -312,6 +364,16 @@ def editar_registro(id):
     
     registro = {'id': id, 'nombre': f'Registro {id}', 'fecha': '2023-05-01'}
     return render_template('editar_registro.html', registro=registro)
+
+@app.route('/registros/crear', methods=['GET', 'POST'])
+@requiere_permiso('editar')  # Asumiendo que crear requiere permiso de edición
+def crear_registro():
+    if request.method == 'POST':
+        # Lógica para guardar el nuevo registro
+        flash('Registro creado exitosamente', 'success')
+        return redirect(url_for('ver_registros'))
+    
+    return render_template('registros/crear_registro.html')
 
 if __name__ == '__main__':
     with app.app_context():

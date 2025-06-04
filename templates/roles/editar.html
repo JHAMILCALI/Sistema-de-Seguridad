@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2 class="mb-4">Editar Rol: {{ rol.nombre }}</h2>
+
+<form method="POST">
+    <div class="mb-3">
+        <label class="form-label">Nombre del Rol</label>
+        <input type="text" class="form-control" value="{{ rol.nombre }}" readonly>
+    </div>
+    
+    <div class="mb-3">
+        <label class="form-label">Permisos</label>
+        <div class="row">
+            {% for permiso in permisos %}
+            <div class="col-md-3">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="permisos" 
+                           value="{{ permiso.id }}" {% if permiso in rol.permisos %}checked{% endif %}>
+                    <label class="form-check-label">{{ permiso.nombre }}</label>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <button type="submit" class="btn btn-primary">Actualizar Rol</button>
+    <a href="{{ url_for('listar_roles') }}" class="btn btn-secondary">Cancelar</a>
+</form>
+{% endblock %}
