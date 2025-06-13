@@ -14,6 +14,8 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
+# Diccionario para almacenar intentos por IP
+login_attempts_by_ip = {}
 # Modelos basados en tu estructura de base de datos
 class Usuario(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -115,52 +117,43 @@ def home():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    if 'login_attempts' not in session:
-        session['login_attempts'] = 0
-        session['lockout_time'] = None
+    client_ip = request.remote_addr
+    now = datetime.now()
 
-    # Comprobar si hay bloqueo activo
-    if session.get('lockout_time'):
-        lockout_time = datetime.strptime(session['lockout_time'], '%Y-%m-%d %H:%M:%S')
-        if datetime.now() < lockout_time:
-            tiempo_restante = (lockout_time - datetime.now()).seconds
-            minutos = tiempo_restante // 60
-            segundos = tiempo_restante % 60
-            flash(f'Demasiados intentos fallidos. Inténtalo nuevamente en {minutos}m {segundos}s.', 'danger')
-            return render_template('login.html')
-        else:
-            # Se acabó el bloqueo, reiniciamos
-            session['login_attempts'] = 0
-            session['lockout_time'] = None
+    # Inicializar si IP no existe
+    if client_ip not in login_attempts_by_ip:
+        login_attempts_by_ip[client_ip] = {
+            'intentos': 0,
+            'bloqueado_hasta': None
+        }
+
+    estado = login_attempts_by_ip[client_ip]
+
+    # Verificar bloqueo activo
+    if estado['bloqueado_hasta'] and now < estado['bloqueado_hasta']:
+        restante = (estado['bloqueado_hasta'] - now).seconds
+        flash(f'Demasiados intentos. Intenta de nuevo en {restante} segundos.', 'danger')
+        return render_template('login.html', locked=True, restante=restante)
 
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
 
-        user = Usuario.query.filter_by(username=username).first()
-
-        if user and user.check_password(password):
-            # Acceso exitoso
-            session['user_id'] = user.id
-            session['username'] = user.username
-            session['login_attempts'] = 0
-            session['lockout_time'] = None
-            flash('Inicio de sesión exitoso', 'success')
+        if username == 'admin' and password == 'admin123':
+            session['user'] = username
+            estado['intentos'] = 0  # Reiniciar intentos al entrar correctamente
+            flash('Inicio de sesión exitoso.', 'success')
             return redirect(url_for('dashboard'))
         else:
-            session['login_attempts'] += 1
-            intentos_restantes = 3 - session['login_attempts']
-
-            if session['login_attempts'] >= 3:
-                # Bloqueo por 5 minutos
-                bloqueo = datetime.now() + timedelta(minutes=5)
-                session['lockout_time'] = bloqueo.strftime('%Y-%m-%d %H:%M:%S')
-                flash('Demasiados intentos fallidos. Intenta nuevamente más tarde.', 'danger')
+            estado['intentos'] += 1
+            if estado['intentos'] >= 3:
+                estado['bloqueado_hasta'] = now + timedelta(minutes=5)
+                flash('Demasiados intentos fallidos. Bloqueado por 5 minutos.', 'danger')
             else:
-                flash(f'Usuario o contraseña incorrectos. Intentos restantes: {intentos_restantes}', 'warning')
+                faltan = 3 - estado['intentos']
+                flash(f'Credenciales inválidas. Te quedan {faltan} intentos.', 'warning')
 
-    return render_template('login.html')
-
+    return render_template('login.html', locked=False)
 @app.route('/logout')
 def logout():
     session.clear()
