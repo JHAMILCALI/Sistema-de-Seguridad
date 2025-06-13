@@ -3,6 +3,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, ses
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
+from datetime import datetime, timedelta
 import os
 
 app = Flask(__name__)
@@ -114,20 +115,50 @@ def home():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    if 'login_attempts' not in session:
+        session['login_attempts'] = 0
+        session['lockout_time'] = None
+
+    # Comprobar si hay bloqueo activo
+    if session.get('lockout_time'):
+        lockout_time = datetime.strptime(session['lockout_time'], '%Y-%m-%d %H:%M:%S')
+        if datetime.now() < lockout_time:
+            tiempo_restante = (lockout_time - datetime.now()).seconds
+            minutos = tiempo_restante // 60
+            segundos = tiempo_restante % 60
+            flash(f'Demasiados intentos fallidos. Inténtalo nuevamente en {minutos}m {segundos}s.', 'danger')
+            return render_template('login.html')
+        else:
+            # Se acabó el bloqueo, reiniciamos
+            session['login_attempts'] = 0
+            session['lockout_time'] = None
+
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
-        
+
         user = Usuario.query.filter_by(username=username).first()
-        
+
         if user and user.check_password(password):
+            # Acceso exitoso
             session['user_id'] = user.id
             session['username'] = user.username
+            session['login_attempts'] = 0
+            session['lockout_time'] = None
             flash('Inicio de sesión exitoso', 'success')
             return redirect(url_for('dashboard'))
         else:
-            flash('Usuario o contraseña incorrectos', 'danger')
-    
+            session['login_attempts'] += 1
+            intentos_restantes = 3 - session['login_attempts']
+
+            if session['login_attempts'] >= 3:
+                # Bloqueo por 5 minutos
+                bloqueo = datetime.now() + timedelta(minutes=5)
+                session['lockout_time'] = bloqueo.strftime('%Y-%m-%d %H:%M:%S')
+                flash('Demasiados intentos fallidos. Intenta nuevamente más tarde.', 'danger')
+            else:
+                flash(f'Usuario o contraseña incorrectos. Intentos restantes: {intentos_restantes}', 'warning')
+
     return render_template('login.html')
 
 @app.route('/logout')
